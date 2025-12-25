@@ -7,7 +7,8 @@
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      background-color: #ffffff;
+      color: #000000;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -15,24 +16,30 @@
       margin: 0;
       padding: 16px;
       box-sizing: border-box;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body.dark-mode {
+      background-color: #121212;
+      color: #eaeaea;
     }
 
     .game {
-      background: #121212;
+      background-color: #f0f0f0;
       padding: 24px 20px 28px;
       border-radius: 16px;
       width: 100%;
       max-width: 380px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.3);
       text-align: center;
       box-sizing: border-box;
     }
 
-    h2 {
-      color: #eaeaea;
-      font-size: 1.5rem;
-      margin-bottom: 20px;
+    body.dark-mode .game {
+      background-color: #1c1c1c;
     }
+
+    h2 { margin-bottom: 20px; }
 
     input, button {
       width: 100%;
@@ -43,172 +50,170 @@
       box-sizing: border-box;
     }
 
-    input {
-      background: #1e1e1e;
-      color: #fff;
-      border: 1px solid #333;
-    }
-
-    input::placeholder {
-      color: #888;
-    }
-
     button {
       border: none;
       background: linear-gradient(135deg, #4facfe, #00f2fe);
-      color: #000;
       font-weight: bold;
       cursor: pointer;
     }
 
-    button:disabled {
-      background: #555;
-      color: #999;
-      cursor: not-allowed;
-    }
+    #hintContainer { margin-top: 16px; font-style: italic; }
+    #message { font-size: 1.5rem; margin-top: 16px; display: none; }
+    #timer { font-size: 2.5rem; margin-top: 18px; display: none; }
+    #winImage { width: 100%; margin-top: 18px; display: none; }
 
-    #hint {
-      margin-top: 16px;
-      font-style: italic;
-      color: #aaa;
-    }
-
-    #message {
-      margin-top: 16px;
-      font-weight: bold;
-    }
-
-    #timer {
-      margin-top: 18px;
-      font-weight: bold;
-      font-size: 1.1rem;
-      color: #4facfe;
-    }
-
-    #winImage {
-      margin-top: 18px;
+    #winVideo {
       width: 100%;
-      border-radius: 14px;
+      aspect-ratio: 9 / 16;
+      margin-top: 18px;
+      border-radius: 12px;
+      display: none;
+      border: none;
     }
   </style>
 </head>
 <body>
 
 <div class="game">
-  
-  <h2 id="title">Találd ki az ajándékom!</h2>
-
-  <input 
-    type="text" 
-    id="guessInput" 
-    placeholder="Tippelj ide"
-    onkeydown="handleEnter(event)"
-  />
-
+  <h2 id="title"></h2>
+  <input id="guessInput" placeholder="Tippelj ide" onkeydown="handleEnter(event)">
   <button id="guessButton" onclick="checkGuess()">Tippelés</button>
+  <button id="toggleDarkMode" onclick="toggleDarkMode()">Dark Mode</button>
 
-  <p id="timer"></p>
-  <p id="hint"></p>
-  <p id="message"></p>
-  <img id="winImage" alt="Győzelem" hidden />
+  <div id="hintContainer"><b>Hint:</b> <span id="hint"></span></div>
+  <div id="message"></div>
+  <div id="timer"></div>
+
+  <img id="winImage" alt="Győzelem">
+  <iframe id="winVideo" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+  <button id="volumeToggle" style="display:none" onclick="toggleVolume()">🔇 Hang be</button>
 </div>
 
 <script>
-  // 🔐 ADMIN CHEAT – Ctrl + Shift + R (csak neked)
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "r") {
-      localStorage.clear();
-      alert("Admin reset aktiválva");
-      location.reload();
-    }
-  });
-
-  const games = [
-    {
-      answers: ["ferrari", "lewis hamilton", "f1"],
-      hints: ["shitbox", "0 győzelem", "legjobb pilóta szerinted"],
-      image: "https://upload.wikimedia.org/wikipedia/commons/3/3e/Lewis_Hamilton_2022.jpg",
-      title: "Találd ki az ajándékom!"
-    },
-    {
-      answers: ["ps5", "playstation"],
-      hints: ["kontroller", "játék", "sony"],
-      image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/PlayStation_5_and_DualSense.jpg",
-      title: "Második kihívás!"
-    }
-  ];
-
-  const unlockDate = new Date("2026-01-09T00:00:00");
-
-  let currentGame = parseInt(localStorage.getItem("currentGame")) || 0;
-  let solved = localStorage.getItem("solved") === "true";
-  let attempts = 0;
-  let countdownInterval;
-
-  const input = document.getElementById("guessInput");
-  const button = document.getElementById("guessButton");
-  const timerText = document.getElementById("timer");
-  const winImage = document.getElementById("winImage");
-
-  document.getElementById("title").textContent = games[currentGame].title;
-
-  if (solved) {
-    showCountdownOnly();
+// JÁTÉK ADATOK
+const games = [
+  {
+    answers: ["ferrari", "lewis hamilton", "f1"],
+    hints: ["shitbox", "0 győzelem", "legjobb pilóta szerinted"],
+    image: "https://upload.wikimedia.org/wikipedia/commons/3/3e/Lewis_Hamilton_2022.jpg",
+    video: "https://www.youtube.com/embed/kl88LBlGyx4?playsinline=1&rel=0",
+    showMedia: true
+  },
+  {
+    answers: ["áram programozás", "áramkör", "circuit"],
+    hints: ["Régen sokat játszottál ezzel", "Nemrég beszéltünk erről", "Áramkör"],
+    showMedia: false
   }
+];
 
-  function checkGuess() {
-    const userGuess = input.value.toLowerCase().trim();
+// ÁLLAPOT
+let currentGame = Number(localStorage.getItem("currentGame")) || 0;
+let attempts = 0;
+const unlockDate = new Date("2026-01-09T00:00:00");
+let countdownInterval = null;
 
-    if (games[currentGame].answers.includes(userGuess)) {
-      localStorage.setItem("solved", "true");
-      winImage.src = games[currentGame].image;
-      winImage.hidden = false;
-      showCountdownOnly();
-    } else if (attempts < games[currentGame].hints.length) {
-      document.getElementById("hint").textContent = games[currentGame].hints[attempts];
-      attempts++;
-    }
+// ELEMEK
+const input = document.getElementById("guessInput");
+const button = document.getElementById("guessButton");
+const hint = document.getElementById("hint");
+const message = document.getElementById("message");
+const timer = document.getElementById("timer");
+const winImage = document.getElementById("winImage");
+const winVideo = document.getElementById("winVideo");
+const volumeToggle = document.getElementById("volumeToggle");
+let isMuted = true;
 
-    input.value = "";
-  }
+// CÍM
+const titleEl = document.getElementById("title");
+titleEl.textContent = currentGame === 0 ? "Találd ki az ajándékom!" : "Második kihívás";
 
-  function showCountdownOnly() {
+// FŐ LOGIKA
+function checkGuess() {
+  const guess = input.value.toLowerCase().trim();
+
+  if (games[currentGame].answers.includes(guess)) {
+    message.textContent = "Eltaláltad!";
+    message.style.display = "block";
+
     input.style.display = "none";
     button.style.display = "none";
-    document.getElementById("hint").style.display = "none";
-    document.getElementById("message").style.display = "none";
+    hint.textContent = "";
 
-    winImage.hidden = false;
+    if (games[currentGame].showMedia) {
+      winImage.src = games[currentGame].image;
+      winImage.style.display = "block";
 
-    updateCountdown();
-    countdownInterval = setInterval(updateCountdown, 1000);
-  }
-
-  function updateCountdown() {
-    const diff = unlockDate - new Date();
-
-    if (diff <= 0) {
-      clearInterval(countdownInterval);
-      localStorage.removeItem("solved");
-      currentGame++;
-      localStorage.setItem("currentGame", currentGame);
-      location.reload();
-      return;
+      winVideo.src = games[currentGame].video + "&autoplay=1&mute=1";
+      isMuted = true;
+      volumeToggle.textContent = "🔊 Hang be";
+      volumeToggle.style.display = "block";
+      winVideo.style.display = "block";
     }
 
-    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
-    const m = Math.floor((diff / (1000 * 60)) % 60);
-    const s = Math.floor((diff / 1000) % 60);
-
-    timerText.textContent = `${d} nap ${h} óra ${m} perc ${s} mp`;
-  }
-
-  function handleEnter(e) {
-    if (e.key === "Enter" && input.style.display !== "none") {
-      checkGuess();
+    if (currentGame === 0) {
+      setTimeout(startCountdown, 60000);
     }
+
+  } else if (attempts < games[currentGame].hints.length) {
+    hint.textContent = games[currentGame].hints[attempts];
+    attempts++;
   }
+
+  input.value = "";
+}
+
+function startCountdown() {
+  message.style.display = "none";
+  timer.style.display = "block";
+
+  if (countdownInterval) clearInterval(countdownInterval);
+  updateCountdown();
+  countdownInterval = setInterval(updateCountdown, 1000);
+}
+
+function updateCountdown() {
+  const diff = unlockDate - new Date();
+
+  if (diff <= 0) {
+    clearInterval(countdownInterval);
+    localStorage.setItem("currentGame", "1");
+    location.reload();
+    return;
+  }
+
+  const d = Math.floor(diff / 86400000);
+  const h = Math.floor(diff / 3600000) % 24;
+  const m = Math.floor(diff / 60000) % 60;
+  const s = Math.floor(diff / 1000) % 60;
+
+  timer.textContent = `${d} nap ${h} óra ${m} perc ${s} mp`;
+}
+
+function handleEnter(e) {
+  if (e.key === "Enter") {
+    checkGuess();
+  }
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle("dark-mode");
+}
+
+function toggleVolume() {
+  if (!winVideo.src) return;
+  isMuted = !isMuted;
+  const base = games[currentGame].video;
+  winVideo.src = base + `&autoplay=1&mute=${isMuted ? 1 : 0}`;
+  volumeToggle.textContent = isMuted ? "🔊 Hang be" : "🔇 Hang ki";
+}
+
+// ADMIN CHEAT (Ctrl + Shift + R)
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "r") {
+    localStorage.clear();
+    location.reload();
+  }
+});
 </script>
 
 </body>
