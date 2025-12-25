@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Találd ki az ajándékom</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .game {
+      background: #121212;
+      padding: 24px 20px 28px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    h2 {
+      color: #eaeaea;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border-radius: 12px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+
+    input {
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #333;
+    }
+
+    input::placeholder {
+      color: #888;
+    }
+
+    button {
+      border: none;
+      background: linear-gradient(135deg, #4facfe, #00f2fe);
+      color: #000;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #555;
+      color: #999;
+      cursor: not-allowed;
+    }
+
+    #hint {
+      margin-top: 16px;
+      font-style: italic;
+      color: #aaa;
+    }
+
+    #message {
+      margin-top: 16px;
+      font-weight: bold;
+    }
+
+    #timer {
+      margin-top: 18px;
+      font-weight: bold;
+      font-size: 1.1rem;
+      color: #4facfe;
+    }
+
+    #winImage {
+      margin-top: 18px;
+      width: 100%;
+      border-radius: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game">
+  
+  <h2 id="title">Találd ki az ajándékom!</h2>
+
+  <input 
+    type="text" 
+    id="guessInput" 
+    placeholder="Tippelj ide"
+    onkeydown="handleEnter(event)"
+  />
+
+  <button id="guessButton" onclick="checkGuess()">Tippelés</button>
+
+  <p id="timer"></p>
+  <p id="hint"></p>
+  <p id="message"></p>
+  <img id="winImage" alt="Győzelem" hidden />
+</div>
+
+<script>
+  // 🔐 ADMIN CHEAT – Ctrl + Shift + R (csak neked)
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "r") {
+      localStorage.clear();
+      alert("Admin reset aktiválva");
+      location.reload();
+    }
+  });
+
+  const games = [
+    {
+      answers: ["ferrari", "lewis hamilton", "f1"],
+      hints: ["shitbox", "0 győzelem", "legjobb pilóta szerinted"],
+      image: "https://upload.wikimedia.org/wikipedia/commons/3/3e/Lewis_Hamilton_2022.jpg",
+      title: "Találd ki az ajándékom!"
+    },
+    {
+      answers: ["ps5", "playstation"],
+      hints: ["kontroller", "játék", "sony"],
+      image: "https://upload.wikimedia.org/wikipedia/commons/4/4e/PlayStation_5_and_DualSense.jpg",
+      title: "Második kihívás!"
+    }
+  ];
+
+  const unlockDate = new Date("2026-01-09T00:00:00");
+
+  let currentGame = parseInt(localStorage.getItem("currentGame")) || 0;
+  let solved = localStorage.getItem("solved") === "true";
+  let attempts = 0;
+  let countdownInterval;
+
+  const input = document.getElementById("guessInput");
+  const button = document.getElementById("guessButton");
+  const timerText = document.getElementById("timer");
+  const winImage = document.getElementById("winImage");
+
+  document.getElementById("title").textContent = games[currentGame].title;
+
+  if (solved) {
+    showCountdownOnly();
+  }
+
+  function checkGuess() {
+    const userGuess = input.value.toLowerCase().trim();
+
+    if (games[currentGame].answers.includes(userGuess)) {
+      localStorage.setItem("solved", "true");
+      winImage.src = games[currentGame].image;
+      winImage.hidden = false;
+      showCountdownOnly();
+    } else if (attempts < games[currentGame].hints.length) {
+      document.getElementById("hint").textContent = games[currentGame].hints[attempts];
+      attempts++;
+    }
+
+    input.value = "";
+  }
+
+  function showCountdownOnly() {
+    input.style.display = "none";
+    button.style.display = "none";
+    document.getElementById("hint").style.display = "none";
+    document.getElementById("message").style.display = "none";
+
+    winImage.hidden = false;
+
+    updateCountdown();
+    countdownInterval = setInterval(updateCountdown, 1000);
+  }
+
+  function updateCountdown() {
+    const diff = unlockDate - new Date();
+
+    if (diff <= 0) {
+      clearInterval(countdownInterval);
+      localStorage.removeItem("solved");
+      currentGame++;
+      localStorage.setItem("currentGame", currentGame);
+      location.reload();
+      return;
+    }
+
+    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const m = Math.floor((diff / (1000 * 60)) % 60);
+    const s = Math.floor((diff / 1000) % 60);
+
+    timerText.textContent = `${d} nap ${h} óra ${m} perc ${s} mp`;
+  }
+
+  function handleEnter(e) {
+    if (e.key === "Enter" && input.style.display !== "none") {
+      checkGuess();
+    }
+  }
+</script>
+
+</body>
+</html>
