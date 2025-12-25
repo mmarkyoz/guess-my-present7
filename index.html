@@ -59,6 +59,80 @@
 
     #hintContainer { margin-top: 16px; font-style: italic; }
     #message { font-size: 1.5rem; margin-top: 16px; display: none; }
+
+/* WIN ANIMATION */
+@keyframes winPop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 0 rgba(255,255,255,0); }
+  50% { box-shadow: 0 0 35px rgba(255,255,255,0.8); }
+  100% { box-shadow: 0 0 0 rgba(255,255,255,0); }
+}
+
+.win-animate {
+  animation: winPop 0.6s ease-out, glow 1.5s ease-in-out;
+}
+
+/* FADE OUT */
+.fade-out {
+  opacity: 0;
+  transition: opacity 2s ease;
+}
+
+/* FADE IN */
+.fade-in {
+  opacity: 0;
+  animation: fadeInSlow 3s ease forwards;
+}
+
+@keyframes fadeInSlow {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* CONFETTI */
+
+/* SNOW */
+.snowflake {
+  position: fixed;
+  top: -10px;
+  color: white;
+  font-size: 12px;
+  user-select: none;
+  pointer-events: none;
+  animation: snowFall linear forwards;
+  z-index: 0;
+}
+
+@keyframes snowFall {
+  to {
+    transform: translateY(110vh);
+    opacity: 0.3;
+  }
+}
+
+/* CONFETTI */
+.confetti {
+  position: fixed;
+  top: -10px;
+  width: 10px;
+  height: 10px;
+  background-color: red;
+  animation: fall 3s linear forwards;
+  z-index: 9999;
+}
+
+@keyframes fall {
+  to {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
     #timer { font-size: 2.5rem; margin-top: 18px; display: none; }
     #winImage { width: 100%; margin-top: 18px; display: none; }
 
@@ -83,6 +157,7 @@
   <div id="hintContainer"><b>Hint:</b> <span id="hint"></span></div>
   <div id="message"></div>
   <div id="timer"></div>
+  <div id="endScreen" class="fade-in" style="display:none;font-size:2rem;margin-top:24px;">🎁<br>Köszönöm, hogy végigjátszottad!<br>💙</div>
 
   <img id="winImage" alt="Győzelem">
   <iframe id="winVideo" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
@@ -132,8 +207,20 @@ function checkGuess() {
   const guess = input.value.toLowerCase().trim();
 
   if (games[currentGame].answers.includes(guess)) {
+    // MOBIL VIBRÁCIÓ NYERÉSKOR
+    if (navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
+    }
+    launchConfetti();
     message.textContent = "Eltaláltad!";
+    message.classList.remove("win-animate");
+    void message.offsetWidth; // restart animation
+    message.classList.add("win-animate");
     message.style.display = "block";
+
+    // CÍM ÉS HINT ELREJTÉSE NYERÉSKOR
+    document.getElementById("title").style.display = "none";
+    document.getElementById("hintContainer").style.display = "none";
 
     input.style.display = "none";
     button.style.display = "none";
@@ -142,16 +229,47 @@ function checkGuess() {
     if (games[currentGame].showMedia) {
       winImage.src = games[currentGame].image;
       winImage.style.display = "block";
+      winImage.classList.remove("win-animate");
+      void winImage.offsetWidth;
+      winImage.classList.add("win-animate");
 
       winVideo.src = games[currentGame].video + "&autoplay=1&mute=1";
       isMuted = true;
       volumeToggle.textContent = "🔊 Hang be";
       volumeToggle.style.display = "block";
       winVideo.style.display = "block";
+      winVideo.classList.remove("win-animate");
+      void winVideo.offsetWidth;
+      winVideo.classList.add("win-animate");
     }
 
     if (currentGame === 0) {
-      setTimeout(startCountdown, 60000);
+      // 1 perc után fade out, majd timer
+      setTimeout(() => {
+        message.classList.add("fade-out");
+        if (games[currentGame].showMedia) {
+          winImage.classList.add("fade-out");
+          winVideo.classList.add("fade-out");
+          volumeToggle.classList.add("fade-out");
+        }
+      }, 60000);
+
+      setTimeout(startCountdown, 62000);
+    } else {
+      // MÁSODIK JÁTÉK UTÁN: VÉGE KÉPERNYŐ
+      setTimeout(() => {
+        message.classList.add("fade-out");
+        const end = document.getElementById("endScreen");
+        end.style.display = "block";
+        end.classList.remove("fade-in");
+        void end.offsetWidth;
+        end.classList.add("fade-in");
+      }, 60000);
+
+      // MINDEN LEZÁRÁSA
+      input.disabled = true;
+      button.disabled = true;
+      localStorage.setItem("gameFinished", "true");
     }
 
   } else if (attempts < games[currentGame].hints.length) {
@@ -163,6 +281,9 @@ function checkGuess() {
 }
 
 function startCountdown() {
+  // TIMER ALATT SE LEGYEN CÍM ÉS HINT
+  document.getElementById("title").style.display = "none";
+  document.getElementById("hintContainer").style.display = "none";
   message.style.display = "none";
   timer.style.display = "block";
 
@@ -214,6 +335,36 @@ document.addEventListener("keydown", (e) => {
     location.reload();
   }
 });
+function launchConfetti() {
+  const colors = ["#ff0000", "#00ff00", "#ffffff", "#ffcc00"]; // karácsonyi
+  for (let i = 0; i < 40; i++) {
+    const conf = document.createElement("div");
+    conf.className = "confetti";
+    conf.style.left = Math.random() * 100 + "vw";
+    conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    conf.style.animationDuration = 2 + Math.random() * 2 + "s";
+    document.body.appendChild(conf);
+    setTimeout(() => conf.remove(), 4000);
+  }
+}
+
+// HULLÓ HÓ INDÍTÁSA
+function startSnow() {
+  setInterval(() => {
+    const snow = document.createElement("div");
+    snow.className = "snowflake";
+    snow.textContent = "❄";
+    snow.style.left = Math.random() * 100 + "vw";
+    snow.style.fontSize = 10 + Math.random() * 10 + "px";
+    snow.style.animationDuration = 6 + Math.random() * 6 + "s";
+    document.body.appendChild(snow);
+
+    setTimeout(() => snow.remove(), 12000);
+  }, 300);
+}
+
+startSnow();
+
 </script>
 
 </body>
